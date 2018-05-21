@@ -1,0 +1,11 @@
+student = LOAD 'student' using PigStorage('\t') AS (student_name:chararray, student_roll:int);
+dump student
+
+results = LOAD 'results' using PigStorage('\t') AS (student_roll:int, student_result:chararray);
+dump results
+
+joined_data = join student by student_roll , results by student_roll;
+dump joined_data;
+
+filtered_results = FILTER joined_data by student_result matches 'pass';
+dump filtered_results;
