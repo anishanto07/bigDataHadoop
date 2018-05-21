@@ -1,0 +1,193 @@
+POC: Airline Analysis
+
+Problem Statement 
+
+A.	Find list of Airports operating in the Country India 
+
+B.	Find the list of Airlines having zero stops 
+
+C.	List of Airlines operating with code share 
+
+D.	Which country (or) territory having highest Airports 
+
+E.	Find the list of Active Airlines in United state 
+
+Dataset
+
+Dataset Description –
+
+In this use case there are 3 data sets. Final_airlines, routes.dat, airports_mod.dat 
+************************************************************ 
+Air Ports data set i.e airports_mod.dat 
+It contains the following fields Airport ID 	Unique OpenFlights identifier for this airport. 
+Name 	Name of airport. May or may not contain the City name. 
+City 	Main city served by airport. May be spelled differently from Name. 
+Country 	Country or territory where airport is located. 
+IATA/FAA 	3-letter FAA code, for airports located in Country "United States of America". 
+3-letter IATA code, for all other airports. 
+Blank if not assigned. 
+ICAO 	4-letter ICAO code. 
+Blank if not assigned. 
+Latitude 	Decimal degrees, usually to six significant digits. Negative is South, positive is North. 
+Longitude 	Decimal degrees, usually to six significant digits. Negative is West, positive is East. 
+Altitude 	In feet. 
+Timezone 	Hours offset from UTC. Fractional hours are expressed as decimals, eg. India is 5.5. 
+DST 	Daylight savings time. One of E (Europe), A (US/Canada), S (South America), O (Australia), Z (New Zealand), N (None) or U (Unknown). See also: Help: Time 
+Tz database time Timezone in "tz" (Olson) format, eg. "America/Los_Angeles". Zone
+
+
+Air Lines Data set: 
+It contains the following fields: 
+Airline 						Unique OpenFlights identifier for this airline. ID 
+Name 						Name of the airline. 
+Alias 	Alias of the airline. For example, All Nippon Airways is commonly known as "ANA". 
+IATA 						2-letter IATA code, if available. 
+ICAO 						3-letter ICAO code, if available. 
+Callsign 					Airline callsign. 
+Country 					Country or territory where airline is incorporated. 
+Active 	"Y" if the airline is or has until recently been operational, "N" if it is defunct. This field is not reliable: in particular, major airlines that stopped flying long ago, but have not had their IATA code reassigned (eg. Ansett/AN), will incorrectly show as "Y".
+
+
+Routes Data set i.e routes.dat 
+It contains the following fields Airline 	2-letter (IATA) or 3-letter (ICAO) code of the airline. 
+Airline ID 	Unique OpenFlights identifier for airline (see Airline). 
+Source airport 	3-letter (IATA) or 4-letter (ICAO) code of the source airport. 
+Source airport ID 	Unique OpenFlights identifier for source airport (see Airport) 
+Destination airport 	3-letter (IATA) or 4-letter (ICAO) code of the destination airport. 
+Destination airport ID Unique                            OpenFlights identifier for destination airport (see Airport) 
+Codeshare 	"Y" if this flight is a codeshare (that is, not operated by Airline, but another carrier), 
+empty otherwise. 
+Stops 	Number of stops on this flight ("0" for direct) 
+Equipment 	3-letter codes for plane type(s) generally used on this flight, separated by spaces 
+
+
+Algorithm to be followed:
+
+Step 1: Analysis of dataset and its attributes.
+Step 2: Upload the datasets in MySQL.
+Step 3: Using Sqoop load all the data from SQL into HDFS.
+Step 4: Create External Hive table as per the attributes of the datasets provided and load the data from HDFS into the External Hive tables created.
+Step 5: Execute the problem statements using SparkSQL (HiveQL + Spark).
+Step 6: Store the same SparkSQL output into HDFS.	
+
+
+POC Flow chart:
+
+ 
+Code Implementation:
+
+/*================== Airline Analysis Project ==================*/
+
+/*====MySql====*/
+
+mysql -u labuser -h mysqldb.edu.cloudlab.com -p edureka
+
+CREATE database Airlines_Analysis_Project;
+USE Airlines_Analysis_Project;
+
+CREATE TABLE airports_mod(Airport_ID INT NOT NULL, Name VARCHAR(50), City varchar(50), Country varchar(50),IATA_FAA varchar(3), ICAO varchar(4), Latitude varchar(20), Longitude varchar(20), Altitude INT, Timezone varchar(20), DST varchar(1), tz_timezone varchar(50), PRIMARY KEY (Airport_ID) );
+
+CREATE TABLE Final_airlines(Airline_ID INT NOT NULL, Name VARCHAR(50), Alias VARCHAR(20), IATA VARCHAR(2), ICAO VARCHAR(3), Callsign VARCHAR(20), 
+Country VARCHAR(50), Active VARCHAR(1), PRIMARY KEY (Airline_ID) );
+
+CREATE TABLE routes(Airline VARCHAR(4), Airline_ID INT NOT NULL, Source_airport VARCHAR(4), Airport_ID INT NOT NULL, Destination_airport VARCHAR(3), 
+Destination_Airport_ID INT NOT NULL, Codeshare VARCHAR(1), 
+Stops INT, Equipment VARCHAR(20), FOREIGN KEY (Airline_ID)REFERENCES Final_airlines(Airline_ID),FOREIGN KEY (Airport_ID)REFERENCES airports_mod(Airport_ID),FOREIGN KEY (Destination_Airport_ID) REFERENCES airports_mod (Airport_ID));
+
+LOAD DATA LOCAL INFILE 'Final_airlines' INTO TABLE Final_airlines FIELDS TERMINATED BY ',' LINES TERMINATED BY '\n';
+
+LOAD DATA LOCAL INFILE 'airports_mod.dat' INTO TABLE airports_mod FIELDS TERMINATED BY ',' LINES TERMINATED BY '\n';
+
+LOAD DATA LOCAL INFILE 'routes.dat' INTO TABLE routes FIELDS TERMINATED BY ',' LINES TERMINATED BY '\n';
+
+
+
+
+
+
+/*====SQOOP====*/
+
+sqoop import --connect jdbc:mysql://sqoopdb.edu.cloudlab.com/Airlines_Analysis_Project --username labuser --password edureka --table Final_airlines -m 1 --target-dir 'sqoop_Airlines_Analysis_Project_Final_airlines';
+
+sqoop import --connect jdbc:mysql://sqoopdb.edu.cloudlab.com/Airlines_Analysis_Project --username labuser --password edureka --table airports_mod -m 1 --target-dir 'sqoop_Airlines_Analysis_Project_airports_mod';
+
+sqoop import --connect jdbc:mysql://sqoopdb.edu.cloudlab.com/Airlines_Analysis_Project --username labuser --password edureka --table routes -m 1 --target-dir 'sqoop_Airlines_Analysis_Project_routes';
+
+/*==== Hive ====*/
+
+CREATE DATABASE Airlines_Analysis_Project;
+USE Airlines_Analysis_Project;
+
+CREATE EXTERNAL TABLE Final_airlines_external
+ (
+ Airline_ID int,
+ Name String,
+ Alias String,
+ IATA String,
+ ICAO String, 
+ Callsign String,
+ Country String,
+ Active String
+) 
+ROW FORMAT delimited fields terminated BY ','
+LOCATION '/user/edureka_338308/sqoop_Airlines_Analysis_Project_Final_airlines';
+CREATE EXTERNAL TABLE routes_external
+ (
+ Airline String,
+ Airline_ID int,
+ Source_airport String,
+ Airport_ID int,
+ Destination_airport String, 
+ Destination_Airport_ID int,
+ Codeshare String,
+ Stops int,
+ Equipment String
+) 
+ROW FORMAT delimited fields terminated BY ','
+LOCATION '/user/edureka_338308/sqoop_Airlines_Analysis_Project_routes';
+
+CREATE EXTERNAL TABLE airports_mod_external
+ (
+ Airport_ID int,
+ Name String,
+ City String,
+ Country String,
+ IATA_FAA String, 
+ ICAO String,
+ Latitude String,
+ Longitude String,
+ Altitude int,
+ Timezone String,
+ DST String,
+ tz_timezone String
+) 
+ROW FORMAT delimited fields terminated BY ','
+LOCATION '/user/edureka_338308/sqoop_Airlines_Analysis_Project_airports_mod';
+
+
+/*====SparkSQL====*/
+val hc  =  new org.apache.spark.sql.hive.HiveContext(sc)
+
+hc.sql("USE Airlines_Analysis_Project")
+
+val result_A = hc.sql("SELECT * FROM airports_mod_external WHERE country = 'India'").show()
+
+val result_B = hc.sql("SELECT a.Airline_ID,a.Name, a.Alias, a.IATA, a.ICAO, a.Callsign, a.Country, a.Active, r.Source_airport, r.Airport_ID, r.Destination_airport, r.Destination_Airport_ID FROM Final_airlines_external a JOIN routes_external r ON a.Airline_ID = r.Airline_ID WHERE r.Stops = 0").show()
+
+val result_C = hc.sql("SELECT a.Airline_ID, a.Name, a.Alias, a.IATA, a.ICAO, a.Callsign, a.Country, a.Active, r.Source_airport, r.Airport_ID, r.Destination_airport, r.Destination_Airport_ID FROM Final_airlines_external a JOIN routes_external r ON a.Airline_ID = r.Airline_ID WHERE r.Codeshare = 'Y'").show();
+
+val result_D = hc.sql("SELECT country AS Country_Highest_Airports FROM (SELECT count(Airport_ID) AS ID_count, country  FROM airports_mod_external GROUP BY country ORDER BY ID_count desc LIMIT 1) AS max_airport").show();
+
+val result_E = hc.sql("SELECT * FROM Final_airlines_external WHERE Country = 'United States' and Active = 'Y'").show();
+
+/*====SparkSQL to HDFS====*/
+
+val result_A = hc.sql("SELECT * FROM airports_mod_external WHERE country = 'India'").rdd.saveAsTextFile("/user/edureka_338308/Airports_IN_India")
+
+val result_B = hc.sql("SELECT a.Airline_ID,a.Name, a.Alias, a.IATA, a.ICAO, a.Callsign, a.Country, a.Active, r.Source_airport, r.Airport_ID, r.Destination_airport, r.Destination_Airport_ID FROM Final_airlines_external a JOIN routes_external r ON a.Airline_ID = r.Airline_ID WHERE r.Stops = 0").rdd.saveAsTextFile("/user/edureka_338308/Airlines_With_Zero_Stops")
+
+val result_C = hc.sql("SELECT a.Airline_ID, a.Name, a.Alias, a.IATA, a.ICAO, a.Callsign, a.Country, a.Active, r.Source_airport, r.Airport_ID, r.Destination_airport, r.Destination_Airport_ID FROM Final_airlines_external a JOIN routes_external r ON a.Airline_ID = r.Airline_ID WHERE r.Codeshare = 'Y'").rdd.saveAsTextFile("/user/edureka_338308/Airlines_CodeShare")
+
+val result_D = hc.sql("SELECT country AS Country_Highest_Airports FROM (SELECT count(Airport_ID) AS ID_count, country  FROM airports_mod_external GROUP BY country ORDER BY ID_count desc LIMIT 1) AS max_airport").rdd.saveAsTextFile("/user/edureka_338308/Country_With_Highest_Airports")
+
+val result_E = hc.sql("SELECT * FROM Final_airlines_external WHERE Country = 'United States' and Active = 'Y'").rdd.saveAsTextFile("/user/edureka_338308/ActiveAirlines_US")
